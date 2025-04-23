@@ -115,6 +115,7 @@ RegisterServerEvent('rsg-horses:server:BuyHorse', function(price, model, stable,
         TriggerClientEvent('ox_lib:notify', src, {title = locale('sv_error_no_cash'), type = 'error', duration = 5000 })
         return
     end
+
     local horseid = GenerateHorseid()
     MySQL.insert('INSERT INTO player_horses(stable, citizenid, horseid, name, horse, gender, active, born) VALUES(@stable, @citizenid, @horseid, @name, @horse, @gender, @active, @born)', {
         ['@stable'] = stable,
@@ -126,35 +127,58 @@ RegisterServerEvent('rsg-horses:server:BuyHorse', function(price, model, stable,
         ['@active'] = false,
         ['@born'] = os.time()
     })
+
     Player.Functions.RemoveMoney('cash', price)
-    
+
     TriggerClientEvent('ox_lib:notify', src, {title = locale('sv_success_horse_owned'), type = 'success', duration = 5000 })
 end)
 
+
 RegisterServerEvent('rsg-horses:server:SetHoresActive', function(id)
     local src = source
-    local Player = RSGCore.Functions.GetPlayer(src)
-    local activehorse = MySQL.scalar.await('SELECT id FROM player_horses WHERE citizenid = ? AND active = ?', {Player.PlayerData.citizenid, true})
-    MySQL.update('UPDATE player_horses SET active = ? WHERE id = ? AND citizenid = ?', { false, activehorse, Player.PlayerData.citizenid })
-    MySQL.update('UPDATE player_horses SET active = ? WHERE id = ? AND citizenid = ?', { true, id, Player.PlayerData.citizenid })
+    local RSGPlayer = RSGCore.Functions.GetPlayer(src)
+    local citizenid = RSGPlayer.PlayerData.citizenid
+    local activehorse = MySQL.scalar.await('SELECT id FROM player_horses WHERE citizenid = ? AND active = ?', {citizenid, true})
+    MySQL.update('UPDATE player_horses SET active = ? WHERE id = ? AND citizenid = ?', { false, activehorse, citizenid })
+    MySQL.update('UPDATE player_horses SET active = ? WHERE id = ? AND citizenid = ?', { true, id, citizenid })
+
+    local targetPlayer = RSGCore.Functions.GetPlayerByCitizenId(citizenid)
+    if (targetPlayer) then
+        local tgt = Player(targetPlayer.PlayerData.source)
+        tgt.state:set('activeHorse', id, true)
+    end
 end)
 
 RegisterServerEvent('rsg-horses:server:SetHoresUnActive', function(id, stableid)
     local src = source
-    local Player = RSGCore.Functions.GetPlayer(src)
-    local activehorse = MySQL.scalar.await('SELECT id FROM player_horses WHERE citizenid = ? AND active = ?', {Player.PlayerData.citizenid, false})
-    MySQL.update('UPDATE player_horses SET active = ? WHERE id = ? AND citizenid = ?', { false, activehorse, Player.PlayerData.citizenid })
-    MySQL.update('UPDATE player_horses SET active = ? WHERE id = ? AND citizenid = ?', { false, id, Player.PlayerData.citizenid })
-    MySQL.update('UPDATE player_horses SET stable = ? WHERE id = ? AND citizenid = ?', { stableid, id, Player.PlayerData.citizenid })
+    local RSGPlayer = RSGCore.Functions.GetPlayer(src)
+    local citizenid = RSGPlayer.PlayerData.citizenid
+    local activehorse = MySQL.scalar.await('SELECT id FROM player_horses WHERE citizenid = ? AND active = ?', {citizenid, false})
+    MySQL.update('UPDATE player_horses SET active = ? WHERE id = ? AND citizenid = ?', { false, activehorse, citizenid })
+    MySQL.update('UPDATE player_horses SET active = ? WHERE id = ? AND citizenid = ?', { false, id, citizenid })
+    MySQL.update('UPDATE player_horses SET stable = ? WHERE id = ? AND citizenid = ?', { stableid, id, citizenid })
+
+    local targetPlayer = RSGCore.Functions.GetPlayerByCitizenId(citizenid)
+    if (targetPlayer) then
+        local tgt = Player(targetPlayer.PlayerData.source)
+        tgt.state:set('activeHorse', nil, true)
+    end
 end)
 
 -- store horse when flee is used
 RegisterServerEvent('rsg-horses:server:fleeStoreHorse', function(stableid)
     local src = source
-    local Player = RSGCore.Functions.GetPlayer(src)
-    local activehorse = MySQL.scalar.await('SELECT id FROM player_horses WHERE citizenid = ? AND active = ?', {Player.PlayerData.citizenid, 1})
-    MySQL.update('UPDATE player_horses SET active = ? WHERE id = ? AND citizenid = ?', { 0, activehorse, Player.PlayerData.citizenid })
-    MySQL.update('UPDATE player_horses SET stable = ? WHERE id = ? AND citizenid = ?', { stableid, activehorse, Player.PlayerData.citizenid })
+    local RSGPlayer = RSGCore.Functions.GetPlayer(src)
+    local citizenid = RSGPlayer.PlayerData.citizenid
+    local activehorse = MySQL.scalar.await('SELECT id FROM player_horses WHERE citizenid = ? AND active = ?', {citizenid, 1})
+    MySQL.update('UPDATE player_horses SET active = ? WHERE id = ? AND citizenid = ?', { 0, activehorse, citizenid })
+    MySQL.update('UPDATE player_horses SET stable = ? WHERE id = ? AND citizenid = ?', { stableid, activehorse, citizenid })
+
+    local targetPlayer = RSGCore.Functions.GetPlayerByCitizenId(citizenid)
+    if (targetPlayer) then
+        local tgt = Player(targetPlayer.PlayerData.source)
+        tgt.state:set('activeHorse', nil, true)
+    end
 end)
 
 RegisterServerEvent('rsg-horses:renameHorse', function(name)
@@ -334,6 +358,7 @@ RegisterNetEvent('rsg-horses:server:openhorseinventory', function(horsestash, in
     local data = { label = 'Horse Inventory', maxweight = invWeight, slots = invSlots }
     exports['rsg-inventory']:OpenInventory(src, horsestash, data)
 end)
+
 
 --------------------------------------
 -- register shop
